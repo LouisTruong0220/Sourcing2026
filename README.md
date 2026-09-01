@@ -14,15 +14,51 @@ Robot giới thiệu sản phẩm của **24 doanh nghiệp Tây Ninh** và dẫ
 
 ---
 
+## ⚠ Kỹ thuật viên: đọc mục này trước
+
+**File APK trong kho này KHÔNG chạy một mình.** Ảnh, video, giọng đọc và cấu hình đều
+nằm ngoài APK — cài mỗi APK thì robot mở lên chỉ hiện một trang báo *"chưa nạp nội dung"*.
+
+Để cài được robot, cần **bộ cài đầy đủ** do Roboworld gửi riêng qua Drive hoặc USB:
+
+```
+Cai-dat-Sourcing-2026/       (khoảng 300 MB)
+  DOC-TRUOC.txt              đọc file này đầu tiên
+  KIEM-TRA.bat               nháy đúp — xem robot đang có gì
+  CAI-DAT.bat                nháy đúp — cài tất cả lên robot
+  DOI-NOI-DUNG.bat           nháy đúp — chỉ đẩy lại ảnh/video
+  Huong-dan-...-2026.pdf     hướng dẫn đầy đủ
+  cai-len-robot.ps1 · adb\ · app\ · noi-dung\
+```
+
+Không cần cài Python, không cần cài Android SDK — **bộ cài kèm sẵn công cụ**.
+
+**Chưa có bộ cài → gọi 0866 153 946.**
+
+Kho công khai này chỉ giữ **APK và hướng dẫn**. Nội dung 24 doanh nghiệp không đưa lên
+đây: trong đó có số điện thoại người đại diện, do Trung tâm Khuyến công và Xúc tiến
+thương mại tỉnh Tây Ninh cung cấp để robot trưng bày tại hội chợ.
+
+---
+
 ## Tải về
 
 | Tệp | Dùng để làm gì |
 |---|---|
-| [`su-kien-sourcing-2026-v1.1.apk`](su-kien-sourcing-2026-v1.1.apk) | Phần mềm cài lên robot — 11,1 MB |
 | [`Huong-dan-trien-khai-robot-Sourcing-2026.pdf`](Huong-dan-trien-khai-robot-Sourcing-2026.pdf) | Hướng dẫn đầy đủ: cài app · đặt điểm bản đồ · tự kiểm · xử lý sự cố — 8 trang |
+| [`su-kien-sourcing-2026-v1.1.apk`](su-kien-sourcing-2026-v1.1.apk) | Bản APK dự phòng, 11,1 MB. Bộ cài đã có sẵn file này — chỉ tải riêng khi cần cài lại mỗi app |
 
-**Đọc PDF trước khi cài.** Cài APK không thôi là chưa đủ: ảnh, video, giọng đọc và
-cấu hình đều nằm ngoài APK và phải đẩy riêng.
+---
+
+## ⚠ BellaBot Pro cài phần mềm QUA MẠNG, không cắm cáp USB
+
+Máy tính và robot phải nối **chung một mạng Wi-Fi**. Bộ cài **tự dò tìm robot** trên
+mạng, không phải đi tìm địa chỉ IP.
+
+Đây là điểm khác với robot lễ tân GreetingBot Nova (nối bằng cáp USB ở đầu máy).
+
+Robot cũng phải đã bật **“Gỡ lỗi lâu dài”** và **khởi động lại** — Roboworld bật sẵn
+trước khi giao máy.
 
 ---
 
@@ -42,26 +78,6 @@ KHÁCH CHẠM   →  DỪNG ĐI NGAY, hiện 9 nhóm hàng
 30 GIÂY KHÔNG AI CHẠM  →  tự về màn chờ và đi tiếp
 PIN DƯỚI 15%           →  tự về "Diem Xuat Phat"
 ```
-
----
-
-## Cài nhanh
-
-Máy tính Windows, cáp USB cắm vào cổng ở **phần đầu robot**:
-
-```powershell
-powershell tools\cai-len-robot.ps1
-```
-
-Một lệnh làm hết: cài APK → đẩy giao diện → đẩy 60 ảnh + 8 video sản phẩm +
-4 clip biểu cảm → đẩy 49 câu giọng đọc → đẩy cấu hình.
-
-Rồi trên robot: **Cài đặt → Chức năng robot → Cài đặt mô-đun → Chọn mô-đun tự khởi
-động → "Hội chợ Tây Ninh"**.
-
-> ⚠ Phải dùng **adb 1.0.41** của Android SDK. `C:\Windows\adb.exe` là bản 1.0.39 của
-> PUDU và nằm sẵn trên PATH — gõ `adb` trần là trúng nó, hai bản giết tiến trình của
-> nhau rồi rớt liên tục.
 
 ---
 
@@ -91,19 +107,8 @@ thuật viên, chưa có thì gọi **0866 153 946**.
 /sdcard/Android/data/com.pudutech.business.sourcing/files/web/
 ```
 
-Doanh nghiệp gửi thêm ảnh hoặc đổi giá thì chỉ cần:
+Doanh nghiệp gửi thêm ảnh hoặc đổi giá → Roboworld gửi thư mục `noi-dung` mới, kỹ thuật
+viên chép đè vào bộ cài rồi nháy đúp **`DOI-NOI-DUNG.bat`**.
 
-```powershell
-python dung-app.py
-powershell tools\cai-len-robot.ps1 -ChiGiaoDien
-```
-
-Mất khoảng một phút. **Không** phải cài lại APK, **không** phải chọn lại mô-đun.
-
----
-
-## Kho này chứa gì
-
-Chỉ **APK và hướng dẫn**, để kỹ thuật viên tải về cài. Mã nguồn và dữ liệu doanh
-nghiệp không đưa lên đây — nội dung 24 doanh nghiệp do Trung tâm Khuyến công và Xúc
-tiến thương mại tỉnh Tây Ninh cung cấp, chưa được công bố.
+Mất khoảng một phút. **Không** phải cài lại APK, **không** phải chọn lại mô-đun,
+**không** phải đặt lại điểm bản đồ.
