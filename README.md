@@ -19,10 +19,14 @@ Robot giới thiệu sản phẩm của **24 doanh nghiệp Tây Ninh** và dẫ
 **File APK trong kho này KHÔNG chạy một mình.** Ảnh, video, giọng đọc và cấu hình đều
 nằm ngoài APK — cài mỗi APK thì robot mở lên chỉ hiện một trang báo *"chưa nạp nội dung"*.
 
-Để cài được robot, cần **bộ cài đầy đủ** do Roboworld gửi riêng qua Drive hoặc USB:
+Để cài được robot, cần **bộ cài đầy đủ**:
+
+### 📦 [Tải bộ cài — Cai-dat-Sourcing-2026.zip (282 MB)](https://drive.google.com/drive/folders/1tlK1qdjFw6iZ3_qo2kD8DwxrUW3wUMuZ?usp=sharing)
+
+Tải xong **giải nén ra ổ cứng** rồi mới chạy — đừng chạy thẳng trong file ZIP.
 
 ```
-Cai-dat-Sourcing-2026/       (khoảng 300 MB)
+Cai-dat-Sourcing-2026/
   DOC-TRUOC.txt              đọc file này đầu tiên
   KIEM-TRA.bat               nháy đúp — xem robot đang có gì
   CAI-DAT.bat                nháy đúp — cài tất cả lên robot
@@ -33,11 +37,11 @@ Cai-dat-Sourcing-2026/       (khoảng 300 MB)
 
 Không cần cài Python, không cần cài Android SDK — **bộ cài kèm sẵn công cụ**.
 
-**Chưa có bộ cài → gọi 0866 153 946.**
+Gặp trục trặc → gọi **0866 153 946**.
 
-Kho công khai này chỉ giữ **APK và hướng dẫn**. Nội dung 24 doanh nghiệp không đưa lên
-đây: trong đó có số điện thoại người đại diện, do Trung tâm Khuyến công và Xúc tiến
-thương mại tỉnh Tây Ninh cung cấp để robot trưng bày tại hội chợ.
+> ⚠ Bộ cài chứa **thông tin liên hệ của 24 doanh nghiệp** do Trung tâm Khuyến công và
+> Xúc tiến thương mại tỉnh Tây Ninh cung cấp để robot trưng bày tại hội chợ. Chỉ dùng
+> cho việc triển khai robot tại sự kiện, đừng chuyển tiếp ra ngoài nhóm triển khai.
 
 ---
 
