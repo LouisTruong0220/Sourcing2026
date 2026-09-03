@@ -167,19 +167,64 @@ $script:TrangThaiCuoi = ""
 
 # Cho robot HIEN RA trong `adb devices`. Noi xong khong hien ngay duoc: bat tay
 # RSA mat vai giay, va may co the di qua trang thai "authorizing" truoc.
+# ⚠ CO BA trang thai "chua duoc phep", khong phai hai:
+#     unauthorized  — da hoi, nguoi dung chua tra loi
+#     authorizing   — DANG hoi, hop thoai vua bat len
+#     (device)      — xong
+#   Ban truoc chi biet hai cai dau nen gap `authorizing` thi cho 10 giay roi bao
+#   "khong noi duoc voi robot nao" — dung luc dang can nguoi ta nhin vao man hinh
+#   robot ma bam mot nut. Dinh that o hien truong 03/09/2026.
+#   Nay gap trang thai do thi KHONG BO CUOC: in han huong dan ra roi cho tiep 90
+#   giay, du de nguoi trong ra cho robot va bam.
 function ChoMay($d) {
     $ip = ($d -split ':')[0]
-    for ($i = 0; $i -lt 15; $i++) {
+    $daNhac = $false
+    $het = (Get-Date).AddSeconds(12)
+    while ($true) {
         $dong = @(DsMayRaw | Where-Object { $_ -match [regex]::Escape($ip) })
         if ($dong) {
             $script:TrangThaiCuoi = ($dong -join " ")
-            if ($dong -match "\sdevice$") { return $true }
-            # unauthorized / offline / authorizing -> de khoi bao chan doan lo
-            if ($dong -match "unauthorized|offline") { return $false }
+            if ($dong -match "\sdevice$") {
+                if ($daNhac) { Write-Host "" ; Xong "Robot da cho phep. Chay tiep." }
+                return $true
+            }
+            if ($dong -match "authorizing|unauthorized") {
+                if (-not $daNhac) {
+                    $daNhac = $true
+                    $het = (Get-Date).AddSeconds(90)
+                    Write-Host ""
+                    Write-Host "  ============================================================" -ForegroundColor Yellow
+                    Write-Host "   ROBOT DANG HOI XIN PHEP - RA BAM NUT TREN MAN HINH ROBOT" -ForegroundColor Yellow
+                    Write-Host "  ============================================================" -ForegroundColor Yellow
+                    Write-Host @"
+   Mang da thong roi, chi con thieu mot cu bam. Lam ngay tren ROBOT:
+
+     1. Cham vao man hinh robot mot cai cho no sang
+        (man hinh cho cua PUDU hay che mat hop thoai).
+     2. Tim hop thoai "Allow USB debugging?" / "Cho phep go loi USB?"
+        - co mot day ky tu dai ben duoi.
+     3. TICH o "Always allow from this computer"
+        (Luon cho phep tu may tinh nay).
+     4. Bam ALLOW / OK / CHO PHEP.
+
+   Dang cho 90 giay... bam xong la o day tu chay tiep, khong phai lam gi them.
+
+   KHONG THAY HOP THOAI NAO? Tren robot vao Cai dat -> Debug, TAT
+   'Go loi lau dai' roi BAT lai, sau do chay lai file .bat nay.
+"@ -ForegroundColor Yellow
+                    Write-Host "   Dang cho: " -NoNewline
+                } else {
+                    Write-Host "." -NoNewline
+                }
+            }
+            elseif ($dong -match "offline") { return $false }
+        }
+        if ((Get-Date) -gt $het) {
+            if ($daNhac) { Write-Host "" }
+            return $false
         }
         Start-Sleep -Milliseconds 700
     }
-    return $false
 }
 
 function Noi($diaChi) {
@@ -288,7 +333,8 @@ if ($Ip) {
 $ds = DsMay
 if (-not $ds) {
     $raw = DsMayRaw
-    $chuaChoPhep = @($raw | Where-Object { $_ -match "unauthorized" })
+    # "authorizing" cung nam o day: no la trang thai DANG hoi, chua ai tra loi.
+    $chuaChoPhep = @($raw | Where-Object { $_ -match "unauthorized|authorizing" })
     $chuaSanSang = @($raw | Where-Object { $_ -match "offline" })
 
     if ($chuaChoPhep) {
@@ -296,18 +342,23 @@ if (-not $ds) {
         Write-Host @"
   $($chuaChoPhep -join "`n  ")
 
-  DAY KHONG PHAI LOI MANG. Duong truyen da thong roi, chi thieu mot cu bam.
+  DAY KHONG PHAI LOI MANG. Duong truyen da thong roi, chi thieu mot cu bam
+  TREN MAN HINH ROBOT - va cu bam do khong lam thay tu may tinh duoc.
 
-  LAM NGAY TREN MAN HINH ROBOT:
-   1. Nhin man hinh robot - dang co hop thoai hoi dai y
-      "Allow USB debugging?" / "Cho phep go loi?" kem mot day ky tu dai.
-   2. Tich vao o "Always allow from this computer"
-      (Luon cho phep tu may tinh nay).
-   3. Bam ALLOW / OK / CHO PHEP.
-   4. Quay lai day, chay lai file .bat nay.
+  LAM NGAY TREN ROBOT:
+   1. Cham vao man hinh robot mot cai cho no sang.
+      (Man hinh cho cua PUDU hay nam de len tren va che mat hop thoai.)
+   2. Tim hop thoai "Allow USB debugging?" / "Cho phep go loi USB?"
+      - co mot day ky tu dai ben duoi.
+   3. TICH o "Always allow from this computer".
+   4. Bam ALLOW / OK / CHO PHEP.
+   5. Quay lai day, chay lai file .bat nay.
 
-  Khong thay hop thoai? Man hinh cho cua robot co the dang che mat no -
-  cham vao man hinh robot mot cai roi nhin lai.
+  KHONG THAY HOP THOAI NAO?
+   - Tren robot: Cai dat -> Debug, TAT 'Go loi lau dai' roi BAT lai.
+     Xong chay lai file .bat nay va NHIN MAN HINH ROBOT trong luc no chay.
+   - Robot dang o man hinh cho hoac dang chay app thi hop thoai bi che.
+     Dua robot ve man hinh Cai dat roi thu lai.
 "@ -ForegroundColor Yellow
         exit 1
     }
