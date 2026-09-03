@@ -162,13 +162,52 @@ function DsMay {
     @(DsMayRaw | Where-Object { $_ -match "\sdevice$" })
 }
 
+# Trang thai may thay o lan cho gan nhat — de doan loi cho dung cho.
+$script:TrangThaiCuoi = ""
+
+# Cho robot HIEN RA trong `adb devices`. Noi xong khong hien ngay duoc: bat tay
+# RSA mat vai giay, va may co the di qua trang thai "authorizing" truoc.
+function ChoMay($d) {
+    $ip = ($d -split ':')[0]
+    for ($i = 0; $i -lt 15; $i++) {
+        $dong = @(DsMayRaw | Where-Object { $_ -match [regex]::Escape($ip) })
+        if ($dong) {
+            $script:TrangThaiCuoi = ($dong -join " ")
+            if ($dong -match "\sdevice$") { return $true }
+            # unauthorized / offline / authorizing -> de khoi bao chan doan lo
+            if ($dong -match "unauthorized|offline") { return $false }
+        }
+        Start-Sleep -Milliseconds 700
+    }
+    return $false
+}
+
 function Noi($diaChi) {
     if (-not $diaChi) { return $false }
     $d = $diaChi.Trim()
     if ($d -notmatch ':\d+$') { $d = "${d}:5555" }
+
+    # ⚠ NGAT TRUOC KHI NOI. adb hay giu lai mot muc ket noi CU DA CHET: lenh
+    #   `connect` tra ve "already connected to ..." nghe rat yen tam, ma
+    #   `adb devices` thi TRONG KHONG, va moi buoc sau deu hong ma khong hieu vi sao.
+    #   Dinh that o hien truong 03/09/2026 (robot 10.112.255.25).
+    #   Ngat truoc thi lan nao cung la bat tay lai tu dau.
+    Adb disconnect $d 2>&1 | Out-Null
     $kq = (Adb connect $d) -join " "
     Write-Host "  $kq"
-    return ($kq -match "connected to")
+    if ($kq -notmatch "connected to") { return $false }
+
+    Write-Host "  Dang cho robot san sang..." -ForegroundColor DarkGray
+    if (ChoMay $d) { return $true }
+
+    # Lan hai: dung han may chu adb roi dung lai. Chua duoc thi thoi.
+    # ⚠ Tren may nay con mot ban adb khac cua PUDU o C:\Windows\adb.exe. Hai ban
+    #   giet tien trinh cua nhau, va sau moi lan bi giet thi danh sach may mat sach.
+    Write-Host "  Chua thay. Dung han may chu adb roi thu lai mot lan..." -ForegroundColor DarkGray
+    Adb kill-server 2>&1 | Out-Null
+    Adb start-server 2>&1 | Out-Null
+    Adb connect $d 2>&1 | Out-Null
+    return (ChoMay $d)
 }
 
 # Do ca lop mang, hoi cong 5555. Mo 254 socket mot luc roi cho chung, thay vi
@@ -288,6 +327,20 @@ if (-not $ds) {
     }
 
     Loi "Khong noi duoc voi robot nao."
+
+    # In nguyen van thu adb tra ve. Khong co doan nay thi moi truc trac deu trong
+    # giong nhau tu ngoai vao, va nguoi o xa khong the doan giup duoc.
+    Write-Host ""
+    Write-Host "  --- adb devices tra ve nguyen van ---" -ForegroundColor DarkGray
+    $tho = @((Adb devices) -split "`n" | ForEach-Object { $_.TrimEnd() })
+    if ($tho) { $tho | ForEach-Object { Write-Host "  | $_" -ForegroundColor DarkGray } }
+    else      { Write-Host "  | (khong co dong nao)" -ForegroundColor DarkGray }
+    if ($script:TrangThaiCuoi) {
+        Write-Host "  Trang thai thay luc cho: $($script:TrangThaiCuoi)" -ForegroundColor DarkGray
+    }
+    Write-Host "  Chup CA CUA SO NAY gui Roboworld neu phai goi ho tro." -ForegroundColor DarkGray
+    Write-Host ""
+
     Write-Host @"
   Kiem tra lai theo thu tu nay:
    - Xem IP robot ngay tren man hinh no:
