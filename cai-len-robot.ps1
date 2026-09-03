@@ -1,4 +1,4 @@
-<#
+﻿<#
     Cai app su kien Vietnam Sourcing 2026 len robot BellaBot Pro.
 
         .\cai-len-robot.ps1                    # cai het: APK + giao dien + anh/video + giong + cau hinh
@@ -60,7 +60,8 @@ param(
     [switch]$ChiGiong,
     [switch]$ChiCauHinh,
     [switch]$LayNhatKy,
-    [switch]$SoiModun
+    [switch]$SoiModun,
+    [switch]$SoiSDK
 )
 
 $ErrorActionPreference = "Stop"
@@ -120,6 +121,21 @@ if (-not (Test-Path $AdbExe)) {
     $AdbExe = "adb"
 }
 function Adb { & $AdbExe @args }
+
+# Chay mot lenh trong robot va LUON tra ve CHUOI.
+#
+# ⚠ adb tra ve $null khi lenh khong in ra gi. Goi thang .Trim() len do la
+#   "You cannot call a method on a null-valued expression" va CA SCRIPT DUNG —
+#   dung o buoc chi doc thong tin, khong hong hoc gi ma nhin nhu app hong nang.
+#   Dinh that o hien truong 03/09/2026 khi hoi phien ban app.
+#
+# ⚠ KHONG dung 2>&1 o day. PowerShell 5.1 boc tung dong stderr cua chuong trinh
+#   ngoai thanh ErrorRecord, gap $ErrorActionPreference='Stop' la nem loi tuy tien.
+function AdbTxt([string]$lenh) {
+    $r = Adb shell $lenh
+    if ($null -eq $r) { return "" }
+    return ((($r | Out-String) -replace "`r", "").Trim())
+}
 
 # Dung san daemon adb. Lan dau chay no in "* daemon not running; starting now"
 # lan giua ket qua, va tien trinh daemon giu lay ong xuat cua cua so — nhin
@@ -431,30 +447,95 @@ if ($dc -match '^\d+\.\d+\.\d+\.\d+') {
         (New-Object System.Text.UTF8Encoding($false)))
 }
 
-$sn  = (Adb shell "getprop ro.serialno").Trim()
-$rom = (Adb shell "getprop ro.build.display.id").Trim()
+$sn  = AdbTxt "getprop ro.serialno"
+$rom = AdbTxt "getprop ro.build.display.id"
 Write-Host "  SN: $sn"
 Write-Host "  ROM: $rom"
 
 # ══════════════ Chi kiem tra ══════════════
 if ($ChiKiemTra) {
     Buoc 2 "Xem may dang co gi"
-    $ban = (Adb shell "dumpsys package $Goi | findstr versionName").Trim()
+    $ban = AdbTxt "dumpsys package $Goi | grep versionName"
     Write-Host "  App da cai : $(if ($ban) { $ban } else { 'CHUA CAI' })"
-    $sw = (Adb shell "ls $ThuMucWeb 2>/dev/null | wc -l").Trim()
-    $sa = (Adb shell "ls $ThuMucWeb/anh-san-pham 2>/dev/null | wc -l").Trim()
-    $sv = (Adb shell "ls $ThuMucWeb/video 2>/dev/null | wc -l").Trim()
-    $sg = (Adb shell "ls $ThuMucGiong 2>/dev/null | wc -l").Trim()
-    $sb = (Adb shell "ls $ThuMucWeb/bieu-cam 2>/dev/null | wc -l").Trim()
+    $sw = AdbTxt "ls $ThuMucWeb 2>/dev/null | wc -l"
+    $sa = AdbTxt "ls $ThuMucWeb/anh-san-pham 2>/dev/null | wc -l"
+    $sv = AdbTxt "ls $ThuMucWeb/video 2>/dev/null | wc -l"
+    $sg = AdbTxt "ls $ThuMucGiong 2>/dev/null | wc -l"
+    $sb = AdbTxt "ls $ThuMucWeb/bieu-cam 2>/dev/null | wc -l"
     Write-Host "  Giao dien  : $sw muc trong web/"
     Write-Host "  Anh        : $sa tep"
     Write-Host "  Video SP   : $sv tep  (chieu tren man quang cao 18,5 inch)"
     Write-Host "  Bieu cam   : $sb tep  (chieu tren man chinh luc du hanh)"
     Write-Host "  Giong doc  : $sg tep MP3"
-    $tele = (Adb shell "ls $ThuMucApp/telegram.json 2>/dev/null").Trim()
+    $tele = AdbTxt "ls $ThuMucApp/telegram.json 2>/dev/null"
     Write-Host "  Telegram   : $(if ($tele) { 'da co cau hinh' } else { 'CHUA CO telegram.json' })"
-    $thieu = (Adb shell "cat $ThuMucApp/thieu-tieng.txt 2>/dev/null | wc -l").Trim()
+    $thieu = AdbTxt "cat $ThuMucApp/thieu-tieng.txt 2>/dev/null | wc -l"
     Write-Host "  Cau thieu tieng: $thieu  (keo ve bang -LayNhatKy)"
+    exit 0
+}
+
+# ══════════════ Soi tang SDK ══════════════
+#
+# Dung khi: robot DA DINH VI, cac che do cua hang chay binh thuong, nhung app
+# minh bao "chua dinh vi / 0 diem".
+#
+# ⚠ HAI CHO TRONG RobotHelper.kt IM LANG KHI HONG, day la ly do phai soi log:
+#     · PdRobotSdk.connectStatusFl  -> khong noi duoc thi daKetNoi = false,
+#       moi ham sau do tra ve rong, KHONG nem loi.
+#     · currentDestinationsFl       -> cho 4 giay khong co gi thi tra ve
+#       DANH SACH RONG. Nhin tu ngoai giong het "ban do khong co diem nao".
+#   Nen "0 diem" co the la ban do that su trong, MA CUNG CO THE la SDK khong
+#   bat tay duoc. Chi log moi phan biet duoc hai cai do.
+if ($SoiSDK) {
+    Buoc 2 "Soi tang SDK - vi sao app khong doc duoc ban do"
+
+    Write-Host "`n--- 1. Phien ban may ---" -ForegroundColor Cyan
+    foreach ($k in @("ro.build.display.id", "ro.serialno", "ro.product.model")) {
+        $v = AdbTxt "getprop $k"
+        if ($v) { Write-Host "  $k = $v" }
+    }
+    (Adb shell "getprop | grep -i -E 'pudu|opensdk|sdk.version'") |
+        ForEach-Object { Write-Host "  $_" }
+
+    Write-Host "`n--- 2. Khoi dong lai app va ghi log 25 giay ---" -ForegroundColor Cyan
+    Write-Host "  Trong luc cho, DUNG dung vao man hinh robot."
+    # ⚠ Nang bo dem log truoc. ROM PUDU in rat nhieu, log cua minh bi day troi
+    #   trong vai giay va `logcat -d` tra ve trong khong.
+    Adb logcat -G 16M 2>&1 | Out-Null
+    Adb logcat -c 2>&1 | Out-Null
+    Adb shell "am force-stop $Goi" 2>&1 | Out-Null
+    Adb shell "am start -n $Goi/vn.roboworld.sourcing.MainActivity" 2>&1 | Out-Null
+    Start-Sleep -Seconds 25
+
+    $log = Adb logcat -d -s SKRobot:V SKPin:V SKManPhu:V SKCau:V AndroidRuntime:E 2>&1
+    $tep = Join-Path $Goc "log-sdk-robot.txt"
+    $log | Out-File -FilePath $tep -Encoding utf8
+    Write-Host ""
+    if ($log) { $log | Select-Object -Last 60 | ForEach-Object { Write-Host "  $_" } }
+    else { Nhac "Khong bat duoc dong log nao - thu chay lai lenh nay mot lan nua." }
+
+    Write-Host "`n--- 3. Doc nhanh ---" -ForegroundColor Cyan
+    $noi = @($log | Where-Object { $_ -match "SDK:" })
+    if ($noi) {
+        $noi | Select-Object -Last 5 | ForEach-Object { Write-Host "  $_" }
+        if ($log -match "SDK: Success") {
+            Xong "SDK BAT TAY DUOC -> van de nam o ban do, khong o SDK"
+        } else {
+            Loi "SDK CHUA BAT TAY DUOC -> day moi la goc. Xem ma loi o dong tren."
+        }
+    } else {
+        Nhac "Khong thay dong 'SDK:' nao. Co the app chua khoi dong lai duoc,"
+        Nhac "hoac ban APK tren may cu hon ban co dong log nay."
+    }
+
+    Write-Host @"
+
+================================================================
+Da luu log day du vao:
+  $tep
+GUI CA FILE DO cho Roboworld - 0866 153 946
+================================================================
+"@ -ForegroundColor Cyan
     exit 0
 }
 
@@ -476,7 +557,7 @@ if ($SoiModun) {
     Buoc 2 "Soi vi sao mo-dun khong hien"
 
     Write-Host "`n--- 1. App da cai chua ---" -ForegroundColor Cyan
-    $co = (Adb shell "pm list packages $Goi").Trim()
+    $co = AdbTxt "pm list packages $Goi"
     if ($co) { Xong "Da cai: $co" } else { Loi "CHUA CAI $Goi" }
     (Adb shell "dumpsys package $Goi | grep -E 'versionName|firstInstallTime|lastUpdateTime'") |
         ForEach-Object { Write-Host "  $_" }
@@ -496,7 +577,7 @@ if ($SoiModun) {
     Write-Host "  (De so voi app minh. Day moi la ban mau dung cho ROM nay.)"
     foreach ($g in @("com.pudutech.business.usher", "com.pudutech.business.delivery",
                      "com.pudutech.business.birthday")) {
-        $ban = (Adb shell "pm list packages $g").Trim()
+        $ban = AdbTxt "pm list packages $g"
         if (-not $ban) { continue }
         Write-Host "`n  [$g]" -ForegroundColor Yellow
         (Adb shell "dumpsys package $g | grep -E 'Action:|Category:'") |
@@ -654,7 +735,7 @@ function Dem($thuMucPC, $duoi) {
 }
 
 function DemMay($duongDanMay) {
-    $n = (Adb shell "ls $duongDanMay 2>/dev/null | wc -l").Trim()
+    $n = AdbTxt "ls $duongDanMay 2>/dev/null | wc -l"
     if ($n -match '^\d+$') { return [int]$n }
     return 0
 }
