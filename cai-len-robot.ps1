@@ -59,7 +59,8 @@ param(
     [switch]$ChiGiaoDien,
     [switch]$ChiGiong,
     [switch]$ChiCauHinh,
-    [switch]$LayNhatKy
+    [switch]$LayNhatKy,
+    [switch]$SoiModun
 )
 
 $ErrorActionPreference = "Stop"
@@ -124,6 +125,19 @@ function Adb { & $AdbExe @args }
 # lan giua ket qua, va tien trinh daemon giu lay ong xuat cua cua so — nhin
 # nhu bi treo. Dung truoc roi nuot dong thong bao di cho gon.
 Adb start-server 2>&1 | Out-Null
+
+# Day mot thu muc sang robot.
+# ⚠ Uu tien `push --sync`: chi day tep NAO CHUA CO hoac DA DOI. Chay lai lan hai
+#   thi gan nhu tuc thi, thay vi day lai ca 280 MB. Rat quan trong khi mang hoi
+#   cho chap chon va phai chay lai vai lan.
+#   Ban adb ma hoa cua PUDU khong chac co co nay, nen hong thi lui ve push thuong.
+function Day($nguon, $dich) {
+    $kq = Adb push --sync "$nguon" "$dich" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $kq = Adb push "$nguon" "$dich" 2>&1
+    }
+    return $kq
+}
 
 function Buoc($n, $chu) { Write-Host "`n[$n] $chu" -ForegroundColor Cyan }
 function Loi($chu)      { Write-Host "  x  $chu" -ForegroundColor Red }
@@ -444,6 +458,69 @@ if ($ChiKiemTra) {
     exit 0
 }
 
+# ══════════════ Soi mo-dun ══════════════
+#
+# Dung khi: cai xong roi ma trong "Chon mo-dun tu khoi dong" tren robot KHONG
+# thay "Hoi cho Tay Ninh".
+#
+# ⚠ CAI GI QUYET DINH MOT APP CO HIEN TRONG DANH SACH DO, HANG KHONG NOI RO.
+#   Tai lieu chi bao "dat applicationId com.pudutech.business.xxx" — thu roi,
+#   CHUA DU. Bo intent-filter dang dung lay tu chinh mo-dun "Dan cho" cua hang
+#   tren MOT CON MAY CU THE (firmware SD2.13.21). Con may ngoai hien truong lai
+#   chay ROM khac han (pd.core.CT1.rk3588s), rat co the hang doi cach liet ke.
+#
+#   Nen cho nay KHONG DOAN. No hoi thang con robot dang o truoc mat: app minh
+#   co duoc he thong nhin thay khong, va mo-dun THAT cua hang tren CHINH MAY DO
+#   khai nhung gi. So hai ben la ra ngay thieu cai gi.
+if ($SoiModun) {
+    Buoc 2 "Soi vi sao mo-dun khong hien"
+
+    Write-Host "`n--- 1. App da cai chua ---" -ForegroundColor Cyan
+    $co = (Adb shell "pm list packages $Goi").Trim()
+    if ($co) { Xong "Da cai: $co" } else { Loi "CHUA CAI $Goi" }
+    (Adb shell "dumpsys package $Goi | grep -E 'versionName|firstInstallTime|lastUpdateTime'") |
+        ForEach-Object { Write-Host "  $_" }
+
+    Write-Host "`n--- 2. He thong co nhin thay app minh nhu mot mo-dun khong ---" -ForegroundColor Cyan
+    Write-Host "  (Hoi: nhung app nao tra loi hanh dong LAUNCHER.FUNCTION cua PUDU)"
+    $tl = Adb shell "cmd package query-activities --brief -a com.pudutech.action.router.LAUNCHER.FUNCTION 2>/dev/null"
+    if ($tl) { $tl | ForEach-Object { Write-Host "  $_" } } else { Write-Host "  (khong tra ve gi)" }
+    Write-Host ""
+    if ($tl -match [regex]::Escape($Goi)) {
+        Xong "App CO trong danh sach he thong -> khai bao dung, vuong o cho khac"
+    } else {
+        Nhac "App KHONG co trong danh sach -> launcher khong nhin thay no"
+    }
+
+    Write-Host "`n--- 3. Mo-dun THAT cua hang tren chinh may nay khai gi ---" -ForegroundColor Cyan
+    Write-Host "  (De so voi app minh. Day moi la ban mau dung cho ROM nay.)"
+    foreach ($g in @("com.pudutech.business.usher", "com.pudutech.business.delivery",
+                     "com.pudutech.business.birthday")) {
+        $ban = (Adb shell "pm list packages $g").Trim()
+        if (-not $ban) { continue }
+        Write-Host "`n  [$g]" -ForegroundColor Yellow
+        (Adb shell "dumpsys package $g | grep -E 'Action:|Category:'") |
+            Select-Object -Unique | ForEach-Object { Write-Host "    $_" }
+    }
+
+    Write-Host "`n--- 4. App minh dang khai gi ---" -ForegroundColor Cyan
+    (Adb shell "dumpsys package $Goi | grep -E 'Action:|Category:'") |
+        Select-Object -Unique | ForEach-Object { Write-Host "    $_" }
+
+    Write-Host "`n--- 5. Mo-dun robot dang chon ---" -ForegroundColor Cyan
+    (Adb shell "grep -a -o 'key_home_launch_module[^ ]*' /sdcard/pudu/appConfig/Common.preferences_pb 2>/dev/null") |
+        ForEach-Object { Write-Host "    $_" }
+
+    Write-Host @"
+
+================================================================
+CHUP CA CUA SO NAY GUI ROBOWORLD - 0866 153 946
+Muc 3 va muc 4 so voi nhau se ra ngay dang thieu khai bao gi.
+================================================================
+"@ -ForegroundColor Cyan
+    exit 0
+}
+
 # ══════════════ Lay nhat ky ══════════════
 if ($LayNhatKy) {
     Buoc 2 "Keo nhat ky ve may tinh"
@@ -512,19 +589,19 @@ if ($LamHet -or $ChiGiaoDien) {
     if (Test-Path $ThuAnh) {
         $n = (Get-ChildItem $ThuAnh -File).Count
         Write-Host "  Day $n anh..."
-        Adb push "$ThuAnh\." "$ThuMucWeb/anh-san-pham/" 2>&1 | Select-Object -Last 1 | Write-Host
+        Day "$ThuAnh\." "$ThuMucWeb/anh-san-pham/" | Select-Object -Last 1 | Write-Host
     }
     if (Test-Path $ThuBieuCam) {
         $n = (Get-ChildItem $ThuBieuCam -File).Count
         Write-Host "  Day $n clip bieu cam..."
-        Adb push "$ThuBieuCam\." "$ThuMucWeb/bieu-cam/" 2>&1 | Select-Object -Last 1 | Write-Host
+        Day "$ThuBieuCam\." "$ThuMucWeb/bieu-cam/" | Select-Object -Last 1 | Write-Host
     }
     if (Test-Path $ThuVideo) {
         $v = Get-ChildItem $ThuVideo -File
         $mb = [math]::Round(($v | Measure-Object Length -Sum).Sum / 1MB, 0)
         Write-Host "  Day $($v.Count) video ($mb MB) - cho vai phut, DUNG TAT MAY."
         Write-Host "  Mat mang giua chung thi chay lai lenh nay, tep da day xong duoc bo qua."
-        Adb push "$ThuVideo\." "$ThuMucWeb/video/" 2>&1 | Select-Object -Last 1 | Write-Host
+        Day "$ThuVideo\." "$ThuMucWeb/video/" | Select-Object -Last 1 | Write-Host
     }
     Xong "Xong giao dien"
 }
@@ -544,7 +621,7 @@ if ($LamHet -or $ChiGiong) {
             $mb = [math]::Round(($mp3 | Measure-Object Length -Sum).Sum / 1MB, 1)
             Write-Host "  Day $($mp3.Count) file MP3 ($mb MB)..."
             Adb shell "mkdir -p $ThuMucGiong" | Out-Null
-            Adb push "$ThuGiongPC\." "$ThuMucGiong/" 2>&1 | Select-Object -Last 1 | Write-Host
+            Day "$ThuGiongPC\." "$ThuMucGiong/" | Select-Object -Last 1 | Write-Host
             Xong "Xong giong doc"
         }
     }
@@ -564,12 +641,63 @@ if ($LamHet -or $ChiCauHinh) {
 }
 
 # ══════════════ 6. Kiem lai ══════════════
+#
+# ⚠ PHAI DEM HAI BEN, KHONG CHI IN SO. Ban truoc chi in "Anh: 12" ra man hinh roi
+#   bao xong — khong ai biet dang le phai la 60. Day 280 MB qua Wi-Fi hoi cho thi
+#   dut giua chung la chuyen thuong, va app van mo len binh thuong, chi la moi the
+#   hang mat anh. Dinh that 03/09/2026: robot chay ok ma anh trong gan het.
 Buoc 6 "Kiem lai tren may"
-$sa = (Adb shell "ls $ThuMucWeb/anh-san-pham 2>/dev/null | wc -l").Trim()
-$sv = (Adb shell "ls $ThuMucWeb/video 2>/dev/null | wc -l").Trim()
-$sb = (Adb shell "ls $ThuMucWeb/bieu-cam 2>/dev/null | wc -l").Trim()
-$sg = (Adb shell "ls $ThuMucGiong 2>/dev/null | wc -l").Trim()
-Write-Host "  Anh: $sa | Video SP: $sv | Bieu cam: $sb | Giong: $sg"
+
+function Dem($thuMucPC, $duoi) {
+    if (-not (Test-Path $thuMucPC)) { return 0 }
+    return @(Get-ChildItem $thuMucPC -File | Where-Object { $_.Name -like $duoi }).Count
+}
+
+function DemMay($duongDanMay) {
+    $n = (Adb shell "ls $duongDanMay 2>/dev/null | wc -l").Trim()
+    if ($n -match '^\d+$') { return [int]$n }
+    return 0
+}
+
+$canCo = @(
+    @{ ten = "Anh san pham"; may = "$ThuMucWeb/anh-san-pham"; pc = Dem $ThuAnh "*" },
+    @{ ten = "Video SP    "; may = "$ThuMucWeb/video";        pc = Dem $ThuVideo "*.mp4" },
+    @{ ten = "Bieu cam    "; may = "$ThuMucWeb/bieu-cam";     pc = Dem $ThuBieuCam "*.mp4" },
+    @{ ten = "Giong doc   "; may = $ThuMucGiong;              pc = Dem $ThuGiongPC "*.mp3" }
+)
+
+$thieu = @()
+foreach ($m in $canCo) {
+    $tren = DemMay $m.may
+    $can  = $m.pc
+    if ($can -eq 0) { continue }
+    if ($tren -ge $can) {
+        Write-Host ("  OK {0} : {1}/{2}" -f $m.ten, $tren, $can) -ForegroundColor Green
+    } else {
+        Write-Host ("  x  {0} : {1}/{2}  -- THIEU {3} TEP" -f $m.ten, $tren, $can, ($can - $tren)) -ForegroundColor Red
+        $thieu += $m.ten.Trim()
+    }
+}
+
+if ($thieu) {
+    Write-Host @"
+
+  ================================================================
+  DAY CHUA XONG - $($thieu -join ', ') con thieu tep tren robot
+  ================================================================
+   App van mo len duoc, nhung se MAT ANH / MAT VIDEO / IM TIENG o
+   nhung cho thieu. Day la chuyen hay gap khi day qua Wi-Fi hoi cho.
+
+   CACH CHUA: nhay dup lai DOI-NOI-DUNG.bat
+   (chi day lai anh/video/giao dien, khong cai lai app, khong mat
+    diem ban do). Chay lai bao nhieu lan cung duoc.
+
+   Neu chay may lan van thieu: dua robot va may tinh sang mot mang
+   khac cho on dinh hon - phat 4G tu dien thoai chang han.
+"@ -ForegroundColor Yellow
+} else {
+    Xong "Da day du toan bo tep sang robot"
+}
 
 Write-Host @"
 
