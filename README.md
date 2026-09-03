@@ -39,6 +39,20 @@ Không cần cài Python, không cần cài Android SDK — **bộ cài kèm s�
 
 Gặp trục trặc → gọi **0866 153 946**.
 
+### 🔧 Bản vá 03/09/2026 — nếu bộ cài báo `cannot resolve host '1'`
+
+Tải [**`cai-len-robot.ps1`**](cai-len-robot.ps1) *(bấm nút Download ở góc phải)* rồi **chép
+đè** vào thư mục bộ cài, ngay cạnh `CAI-DAT.bat`. Chạy lại là xong — không phải tải lại
+cả bộ 282 MB.
+
+Bản vá sửa hai chỗ:
+
+- Bộ dò tìm robot lấy sai địa chỉ khi trên mạng chỉ có **đúng một** máy — nó cắt lấy ký
+  tự đầu của địa chỉ IP nên báo `cannot resolve host '1'`.
+- Trước đây mọi trục trặc đều báo chung một câu *"Khong noi duoc voi robot nao"*. Nay nói
+  rõ **robot đã nối được nhưng chưa bấm "Cho phép gỡ lỗi" trên màn hình máy** — đây là
+  nguyên nhân hay gặp nhất, và cách sửa chỉ là bấm một nút trên robot.
+
 > ⚠ Bộ cài chứa **thông tin liên hệ của 24 doanh nghiệp** do Trung tâm Khuyến công và
 > Xúc tiến thương mại tỉnh Tây Ninh cung cấp để robot trưng bày tại hội chợ. Chỉ dùng
 > cho việc triển khai robot tại sự kiện, đừng chuyển tiếp ra ngoài nhóm triển khai.
